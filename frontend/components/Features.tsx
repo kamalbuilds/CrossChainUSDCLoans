@@ -4,6 +4,7 @@ import React, { Suspense, useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei'
 import dynamic from 'next/dynamic'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const CrossChainEcosystem = dynamic(() => import('@/components/CrossChainEcosystem'), { ssr: false })
 const FeatureIsland = dynamic(() => import('@/components/FeatureIsland'), { ssr: false })
@@ -51,10 +52,28 @@ export default function Features() {
             <OrbitControls enableZoom={true} maxPolarAngle={Math.PI / 2} minPolarAngle={Math.PI / 6} />
             
             <Html fullscreen>
-              <div className="absolute top-0 left-0 p-4 text-yellow-300 bg-black bg-opacity-50 rounded-lg m-4">
-                <h1 className="text-4xl font-bold mb-2 text-yellow-400">CrossChain USDCLoans</h1>
+              <motion.div 
+                initial={{ opacity: 0, y: -50 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="absolute top-0 left-0 p-4 text-yellow-300 bg-black bg-opacity-50 rounded-lg m-4"
+              >
+                <h1 className="text-4xl font-bold mb-2 text-yellow-400">Features</h1>
                 <p className="text-xl text-yellow-200">Empowering global access to digital dollars</p>
-              </div>
+              </motion.div>
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentFeature}
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -50 }}
+                  transition={{ duration: 0.5 }}
+                  className="absolute bottom-0 left-0 right-0 p-4 text-yellow-300 bg-black bg-opacity-50 rounded-lg m-4"
+                >
+                  <h2 className="text-2xl font-bold mb-2">{features[currentFeature].title}</h2>
+                  <p className="text-lg">{features[currentFeature].description}</p>
+                </motion.div>
+              </AnimatePresence>
             </Html>
           </Canvas>
         </div>
