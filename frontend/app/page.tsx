@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useState } from 'react'
+import React, { Suspense, useState, useEffect } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei'
 import dynamic from 'next/dynamic'
@@ -19,7 +19,15 @@ const features = [
 ]
 
 export default function LandingPage() {
-  const [currentFeature, setCurrentFeature] = useState(null)
+  const [currentFeature, setCurrentFeature] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentFeature((prev) => (prev + 1) % features.length)
+    }, 5000) // Change feature every 5 seconds
+
+    return () => clearInterval(timer)
+  }, [])
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-900">
@@ -29,7 +37,7 @@ export default function LandingPage() {
             <PerspectiveCamera makeDefault position={[0, 10, 20]} fov={60} />
             <ambientLight intensity={0.2} />
             <Suspense fallback={null}>
-              <CrossChainEcosystem setCurrentFeature={setCurrentFeature} />
+              <CrossChainEcosystem />
               {features.map((feature, index) => (
                 <FeatureIsland 
                   key={index}
