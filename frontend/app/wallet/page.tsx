@@ -20,7 +20,7 @@ import { auth } from "@/auth";
 export default async function Page() {
   const session = await auth(); // Call the auth function
   return (
-    <CenterContainer>
+    <CenterContainer className="mt-16">
       <div className="flex flex-col mx-2 h-full">
         <Header />
         <UserProfile />

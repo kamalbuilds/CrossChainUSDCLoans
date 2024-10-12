@@ -28,7 +28,7 @@ import LiquidityChart from "@/components/LiquidityChart"
 import UserOptions from "@/components/UserOptions"
 import { ethers } from "ethers"
 
-export default function Home() {
+export default function Dashboard() {
   const [deposited, setDeposited] = useState(0)
   const [borrowed, setBorrowed] = useState(0)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -146,7 +146,7 @@ export default function Home() {
     const contract = getContract({
       client,
       chain: defineChain(11155111),
-      address: "0x76414c98ee9AD3F776054f16A351831b71870Ff3",
+      address: "",
     })
 
     const borrowsdata = await readContract({

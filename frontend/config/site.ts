@@ -9,6 +9,14 @@ export const siteConfig = {
       title: "Home",
       href: "/",
     },
+    {
+      title: "Circle Wallet",
+      href: "/wallet",
+    },
+    {
+      title: "Dashboard",
+      href: "/dashboard",
+    }
   ],
   links: {
     twitter: "https://twitter.com/0xkamal7",

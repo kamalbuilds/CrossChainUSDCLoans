@@ -33,9 +33,11 @@ export default function LandingPage() {
             Access stable digital dollars globally through our decentralized, cross-chain lending platform.
           </motion.p>
           <motion.div variants={fadeIn} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Button size="lg" className="font-semibold">
-              Start Borrowing <ArrowRight className="ml-2" />
-            </Button>
+            <Link href="/dashboard">
+              <Button size="lg" className="font-semibold">
+                Start Borrowing <ArrowRight className="ml-2" />
+              </Button>
+            </Link>
           </motion.div>
         </motion.section>
 

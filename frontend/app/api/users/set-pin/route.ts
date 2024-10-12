@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
       userId: session.user.id,
     });
 
+    console.log(userAccess,"useraccess");
+
     // throw an error if the user token is null
     if (!userAccess.data?.userToken)
       throw new Error("Failed to create user token");
@@ -60,6 +62,8 @@ export async function GET(req: NextRequest) {
       blockchains: ["ETH-SEPOLIA"],
       accountType: "SCA",
     });
+
+    console.log(challengId,"challengId");
 
     // throw an error if the challenge id is null
     if (!challengId.data?.challengeId)

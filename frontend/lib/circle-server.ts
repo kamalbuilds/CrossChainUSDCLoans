@@ -9,6 +9,7 @@ import env from "./env";
 // Create a new Circle API client
 const circleServer = initiateUserControlledWalletsClient({
   apiKey: env.NEXT_PUBLIC_CIRCLE_API_KEY,
+  baseUrl: "https://api.circle.com",
 });
 
 // Export the Circle API client
