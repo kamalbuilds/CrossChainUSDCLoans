@@ -8,6 +8,13 @@ import { SiteHeader } from "@/components/site-header"
 import { TailwindIndicator } from "@/components/tailwind-indicator"
 import { ThemeProvider } from "@/components/theme-provider"
 import { ThirdwebProvider } from "thirdweb/react";
+import { auth } from "@/auth";
+
+
+import AuthProvider from "@/providers/auth";
+import QueryProvider from "@/providers/query";
+import ModalsProvider from "@/providers/modals";
+
 
 export const metadata: Metadata = {
   title: {
@@ -27,10 +34,13 @@ export const metadata: Metadata = {
 }
 
 interface RootLayoutProps {
-  children: React.ReactNode
+  children: React.ReactNode,
+  modal: React.ReactNode
 }
 
-export default function RootLayout({ children }: RootLayoutProps) {
+export default async function RootLayout({ children , modal }: RootLayoutProps) {
+
+  const session = await auth();
   return (
     <>
       <html lang="en" suppressHydrationWarning>
@@ -41,15 +51,22 @@ export default function RootLayout({ children }: RootLayoutProps) {
             fontSans.variable
           )}
         >
+           <AuthProvider session={session}>
+           <QueryProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <ThirdwebProvider>
             <div className="relative flex min-h-screen flex-col">
               <SiteHeader />
-              <div className="flex-1">{children}</div>
+              <div className="flex-1">{children}
+              {modal}
+              <ModalsProvider />
+              </div>
             </div>
             <TailwindIndicator />
             </ThirdwebProvider>
           </ThemeProvider>
+          </QueryProvider>
+        </AuthProvider>
         </body>
       </html>
     </>
