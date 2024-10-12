@@ -3,14 +3,23 @@ pragma solidity ^0.8.0;
 
 import "./IWormholeRelayer.sol";
 import "./IWormholeReceiver.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-// Find the relayer addr from docs - https://docs.wormhole.com/wormhole/reference/blockchain-environments/evm#wormhole-details-18
-contract CrossChainLendingHub is IWormholeReceiver{
+contract CrossChainLendingHub is IWormholeReceiver, ReentrancyGuard, Ownable {
     // gas limit set
     uint256 constant GAS_LIMIT = 500_000;
 
     IWormholeRelayer public immutable wormholeRelayer;
     uint16 hubChainID;
+
+    uint256 public constant INTEREST_RATE = 5; // 5% annual interest rate
+    uint256 public lastInterestUpdate;
+
+    mapping(address => uint256) public lastInteractionTime;
+    uint256 public constant INTERACTION_COOLDOWN = 1 hours;
+
+    event InterestAccrued(uint256 totalInterest);
 
     function quoteCrossChainCost(
         uint16 targetChain
@@ -37,17 +46,21 @@ contract CrossChainLendingHub is IWormholeReceiver{
     event Borrow(uint16 spoke, address user, uint256 amount);
     event Repay(uint16 spoke, address user, uint256 amount, uint256 remaining);
 
-    constructor(address _wormholeRelayer, uint16 _hubChainID) {
+    constructor(address _wormholeRelayer, uint16 _hubChainID) Ownable(msg.sender) {
         wormholeRelayer = IWormholeRelayer(_wormholeRelayer);
         hubChainID = _hubChainID;
+        lastInterestUpdate = block.timestamp;
     }
 
-    function deposit(uint16 spoke, address user, uint256 amount) internal {
+    function deposit(uint16 spoke, address user, uint256 amount) internal nonReentrant {
+        require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
+        updateInterest();
         deposits[user] += amount;
         spokeBalances[spoke] += amount;
         spokeBalancesHistorical[spoke].push(spokeBalances[spoke]);
 
         emit Deposit(spoke, user, amount, deposits[user]);
+        lastInteractionTime[user] = block.timestamp;
     }
 
     // Allows users to repay their borrowed ETH
@@ -55,7 +68,9 @@ contract CrossChainLendingHub is IWormholeReceiver{
     // This doesn't return in a failure case, so if a user tries to repay more 
     // than they owe or if they don't have any outstanding borrows, their funds
     // will be locked in the contract.
-    function repayBorrow(uint16 spoke, address user, uint256 amount) internal {
+    function repayBorrow(uint16 spoke, address user, uint256 amount) internal nonReentrant {
+        require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
+        updateInterest();
         uint256 borrowedAmount = borrows[user];
 
         require(borrowedAmount > 0, "No outstanding borrow");
@@ -66,9 +81,12 @@ contract CrossChainLendingHub is IWormholeReceiver{
         spokeBalancesHistorical[spoke].push(spokeBalances[spoke]);
 
         emit Repay(spoke, user, amount, borrows[user]);
+        lastInteractionTime[user] = block.timestamp;
     }
 
-    function requestWithdraw(uint16 spoke, address user, uint256 amount) internal {
+    function requestWithdraw(uint16 spoke, address user, uint256 amount) internal nonReentrant {
+        require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
+        updateInterest();
         require(deposits[user] >= amount, "Insufficient balance");
         deposits[user] -= amount;
         
@@ -91,9 +109,12 @@ contract CrossChainLendingHub is IWormholeReceiver{
 
 
         emit Withdraw(spoke, user, amount, deposits[user]);
+        lastInteractionTime[user] = block.timestamp;
     }
 
-    function requestBorrow(uint16 spoke, address user, uint256 amount) internal {
+    function requestBorrow(uint16 spoke, address user, uint256 amount) internal nonReentrant {
+        require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
+        updateInterest();
         require(deposits[user] / 2 >= borrows[user] + amount, "Not enough collateral");
         
         withdrawSpoke(spoke, amount);
@@ -115,6 +136,7 @@ contract CrossChainLendingHub is IWormholeReceiver{
         );
 
         emit Borrow(spoke, user, amount);
+        lastInteractionTime[user] = block.timestamp;
     }
 
     function receiveWormholeMessages(
@@ -228,7 +250,7 @@ contract CrossChainLendingHub is IWormholeReceiver{
         );
     }
 
-    function addSpoke(uint16 spoke, address spokeAddress) internal {
+    function addSpoke(uint16 spoke, address spokeAddress) external onlyOwner {
         spokes.push(spoke);
         spokeAddresses[spoke] = spokeAddress;
         spokeBalances[spoke] = 0;
@@ -247,5 +269,27 @@ contract CrossChainLendingHub is IWormholeReceiver{
 
     function sendEth(address payable recipient, uint256 amount) external {
         recipient.transfer(amount);
+    }
+
+    function updateInterest() internal {
+        uint256 timeElapsed = block.timestamp - lastInterestUpdate;
+        if (timeElapsed > 0) {
+            uint256 totalBorrows = 0;
+            for (uint256 i = 0; i < spokes.length; i++) {
+                totalBorrows += spokeBalances[spokes[i]];
+            }
+            uint256 interest = totalBorrows * INTEREST_RATE * timeElapsed / (365 days * 100);
+            
+            // Distribute interest to depositors
+            for (uint256 i = 0; i < spokes.length; i++) {
+                uint16 spoke = spokes[i];
+                uint256 spokeInterest = interest * spokeBalances[spoke] / totalBorrows;
+                spokeBalances[spoke] += spokeInterest;
+                spokeBalancesHistorical[spoke].push(spokeBalances[spoke]);
+            }
+
+            lastInterestUpdate = block.timestamp;
+            emit InterestAccrued(interest);
+        }
     }
 }

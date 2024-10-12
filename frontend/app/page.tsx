@@ -1,64 +1,95 @@
-"use client";
-
-import React, { Suspense, useState, useEffect } from 'react'
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei'
-import dynamic from 'next/dynamic'
-
-const CrossChainEcosystem = dynamic(() => import('@/components/CrossChainEcosystem'), { ssr: false })
-const FeatureIsland = dynamic(() => import('@/components/FeatureIsland'), { ssr: false })
-const Torch = dynamic(() => import('@/components/Torch'), { ssr: false })
-
-const features = [
-  { title: "Cross-Chain Interoperability", description: "Seamless transactions across multiple blockchain networks" },
-  { title: "USDC Loans and Borrowing", description: "Decentralized lending system for global financial access" },
-  { title: "Programmable Wallets", description: "Secure asset management with full user custody" },
-  { title: "Secure Smart Contracts", description: "Transparent and audited financial transactions" },
-  { title: "CCTP Integration", description: "Smooth USDC movement across blockchain ecosystems" },
-  { title: "Global Accessibility", description: "Financial inclusion without traditional banking" },
-]
+import Features from "@/components/Features"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { ArrowRight, Globe, Lock, Repeat, Wallet } from "lucide-react"
 
 export default function LandingPage() {
-  const [currentFeature, setCurrentFeature] = useState(0)
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentFeature((prev) => (prev + 1) % features.length)
-    }, 5000) // Change feature every 5 seconds
-
-    return () => clearInterval(timer)
-  }, [])
-
   return (
-    <div className="flex flex-col min-h-screen bg-gray-900">
-      <main className="flex-grow">
-        <div className="w-full h-screen">
-          <Canvas>
-            <PerspectiveCamera makeDefault position={[0, 10, 20]} fov={60} />
-            <ambientLight intensity={0.2} />
-            <Suspense fallback={null}>
-              <CrossChainEcosystem />
-              {features.map((feature, index) => (
-                <FeatureIsland 
-                  key={index}
-                  position={[Math.cos(index * Math.PI / 3) * 10, 0, Math.sin(index * Math.PI / 3) * 10]}
-                  feature={feature}
-                  isActive={currentFeature === index}
-                />
-              ))}
-              <Torch position={[0, 10, 5]} />
-            </Suspense>
-            <OrbitControls enableZoom={true} maxPolarAngle={Math.PI / 2} minPolarAngle={Math.PI / 6} />
-            
-            <Html fullscreen>
-              <div className="absolute top-0 left-0 p-4 text-yellow-300 bg-black bg-opacity-50 rounded-lg m-4">
-                <h1 className="text-4xl font-bold mb-2 text-yellow-400">CrossChain USDCLoans</h1>
-                <p className="text-xl text-yellow-200">Empowering global access to digital dollars</p>
-              </div>
-            </Html>
-          </Canvas>
-        </div>
+    <div className="min-h-screen bg-gradient-to-b from-blue-100 to-white">
+
+      <main className="container mx-auto px-4 py-16">
+        <section className="mb-16 text-center">
+          <h1 className="mb-4 text-5xl font-bold text-gray-900">Empowering Enterprises with Blockchain Innovation</h1>
+          <p className="mb-8 text-xl text-gray-600">
+            Access stable digital dollars globally through our decentralized, cross-chain lending platform.
+          </p>
+          <Button size="lg" className="font-semibold">
+            Start Borrowing <ArrowRight className="ml-2" />
+          </Button>
+        </section>
+
+        <section className="mb-16">
+          <h2 className="mb-8 text-center text-3xl font-bold text-gray-900">Key Features</h2>
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
+            <FeatureCard
+              icon={<Repeat className="h-8 w-8 text-blue-500" />}
+              title="Cross-Chain Interoperability"
+              description="Seamlessly access USDC across multiple blockchain networks without friction."
+            />
+            <FeatureCard
+              icon={<Globe className="h-8 w-8 text-blue-500" />}
+              title="Global Accessibility"
+              description="Hold and transact in USDC without needing a traditional bank account."
+            />
+            <FeatureCard
+              icon={<Wallet className="h-8 w-8 text-blue-500" />}
+              title="Programmable Wallets"
+              description="Securely manage digital assets across multiple applications."
+            />
+            <FeatureCard
+              icon={<Lock className="h-8 w-8 text-blue-500" />}
+              title="Secure Smart Contracts"
+              description="Fully-audited smart contracts ensure transparent and secure transactions."
+            />
+          </div>
+        </section>
+
+        <section className="mb-16 text-center">
+          <h2 className="mb-4 text-3xl font-bold text-gray-900">Powered by Circle's Technology Stack</h2>
+          <p className="mb-8 text-xl text-gray-600">
+            Leveraging USDC, Wormhole, Programmable Wallets, CCTP, and NTT for a robust and secure platform.
+          </p>
+          <div className="flex justify-center space-x-4">
+            <img src="/placeholder.svg?height=50&width=50" alt="USDC Logo" className="h-12 w-12" />
+            <img src="/placeholder.svg?height=50&width=50" alt="Wormhole Logo" className="h-12 w-12" />
+            <img src="/placeholder.svg?height=50&width=50" alt="Circle Logo" className="h-12 w-12" />
+          </div>
+        </section>
+
+        <Features />
+
+        <section className="text-center">
+          <h2 className="mb-4 text-3xl font-bold text-gray-900">Ready to Get Started?</h2>
+          <p className="mb-8 text-xl text-gray-600">
+            Join the future of decentralized finance with CrossChain USDCLoans.
+          </p>
+          <Button size="lg" className="font-semibold">
+            Create Account <ArrowRight className="ml-2" />
+          </Button>
+        </section>
       </main>
+
+      <footer className="bg-gray-100 py-8">
+        <div className="container mx-auto px-4 text-center text-gray-600">
+          © 2024 CrossChain USDCLoans. All rights reserved.
+        </div>
+      </footer>
     </div>
+  )
+}
+
+function FeatureCard({ icon, title, description }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center text-xl">
+          {icon}
+          <span className="ml-2">{title}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <CardDescription>{description}</CardDescription>
+      </CardContent>
+    </Card>
   )
 }

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./MultiChainToken.sol";
-
-// wormhole imports
+import "./CrossChainToken.sol";
 import "./IWormholeReceiver.sol";
 import "./IWormholeRelayer.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
-// 
-contract CrossChainLendingSpoke is IWormholeReceiver {
+contract CrossChainLendingSpoke is IWormholeReceiver, ReentrancyGuard, Pausable , Ownable{
     uint256 constant GAS_LIMIT = 500_000;
     IWormholeRelayer public immutable wormholeRelayer;
     uint16 spokeChainID;
@@ -17,13 +17,21 @@ contract CrossChainLendingSpoke is IWormholeReceiver {
 
 
     address crossChainMessageAddr;
-    MultiChainToken public token;
+    CrossChainToken public token;
 
     mapping(address => uint256) public approvedWithdraws;
     mapping(address => uint256) public approvedBorrows;
 
-    constructor(address _tokenAddr, address _wormholeRelayer, uint16 _spokeChainID, uint16 _hubChainID, address _hubAddress) {
-        token = MultiChainToken(_tokenAddr);
+    uint256 public constant MAX_BORROW_RATIO = 75; // 75% of collateral
+    uint256 public constant LIQUIDATION_THRESHOLD = 80; // 80% of collateral
+
+    mapping(address => uint256) public lastInteractionTime;
+    uint256 public constant INTERACTION_COOLDOWN = 1 hours;
+
+    event LiquidationTriggered(address user, uint256 amount);
+
+    constructor(address _tokenAddr, address _wormholeRelayer, uint16 _spokeChainID, uint16 _hubChainID, address _hubAddress) Ownable(msg.sender) {
+        token = CrossChainToken(_tokenAddr);
         wormholeRelayer = IWormholeRelayer(_wormholeRelayer);
         spokeChainID = _spokeChainID;
         hubChainID = _hubChainID;
@@ -41,7 +49,8 @@ contract CrossChainLendingSpoke is IWormholeReceiver {
     }
 
     // Allows users to deposit ETH into the contract
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount) external whenNotPaused nonReentrant {
+        require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 
         require(token.transferFrom(user, address(this), amount), "Transfer failed");
@@ -60,9 +69,11 @@ contract CrossChainLendingSpoke is IWormholeReceiver {
             0,
             GAS_LIMIT
         );
+        lastInteractionTime[msg.sender] = block.timestamp;
     }
 
-    function repayBorrow(uint256 amount) external {
+    function repayBorrow(uint256 amount) external whenNotPaused nonReentrant {
+        require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 
         require(token.transferFrom(user, address(this), amount), "Transfer failed");
@@ -81,9 +92,11 @@ contract CrossChainLendingSpoke is IWormholeReceiver {
             0,
             GAS_LIMIT
         );
+        lastInteractionTime[msg.sender] = block.timestamp;
     }
 
-    function requestWithdraw(uint256 amount) external {
+    function requestWithdraw(uint256 amount) external whenNotPaused nonReentrant {
+        require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 
         uint256 cost = quoteCrossChainCost(hubChainID);
@@ -100,9 +113,11 @@ contract CrossChainLendingSpoke is IWormholeReceiver {
             0,
             GAS_LIMIT
         );
+        lastInteractionTime[msg.sender] = block.timestamp;
     }
 
-    function requestBorrow(uint256 amount) external {
+    function requestBorrow(uint256 amount) external whenNotPaused nonReentrant {
+        require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 
         uint256 cost = quoteCrossChainCost(hubChainID);
@@ -119,6 +134,7 @@ contract CrossChainLendingSpoke is IWormholeReceiver {
             0,
             GAS_LIMIT
         );
+        lastInteractionTime[msg.sender] = block.timestamp;
     }
 
     function withdraw(address sender) internal {
@@ -208,6 +224,26 @@ contract CrossChainLendingSpoke is IWormholeReceiver {
 
     function sendEth(address payable recipient, uint256 amount) external {
         recipient.transfer(amount);
+    }
+
+    function triggerLiquidation(address user) external whenNotPaused {
+        uint256 collateral = token.balanceOf(address(this));
+        uint256 borrowed = approvedBorrows[user];
+        require(borrowed > collateral * LIQUIDATION_THRESHOLD / 100, "Position not liquidatable");
+
+        uint256 liquidationAmount = borrowed - (collateral * MAX_BORROW_RATIO / 100);
+        approvedBorrows[user] -= liquidationAmount;
+        token.transfer(msg.sender, liquidationAmount);
+
+        emit LiquidationTriggered(user, liquidationAmount);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
 }
