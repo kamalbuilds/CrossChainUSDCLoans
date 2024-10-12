@@ -2,11 +2,12 @@
 
 import React, { Suspense, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Text, PerspectiveCamera, Html } from '@react-three/drei'
+import { OrbitControls, PerspectiveCamera, Html } from '@react-three/drei'
 import dynamic from 'next/dynamic'
 
 const CrossChainEcosystem = dynamic(() => import('@/components/CrossChainEcosystem'), { ssr: false })
 const FeatureIsland = dynamic(() => import('@/components/FeatureIsland'), { ssr: false })
+const Torch = dynamic(() => import('@/components/Torch'), { ssr: false })
 
 const features = [
   { title: "Cross-Chain Interoperability", description: "Seamless transactions across multiple blockchain networks" },
@@ -21,13 +22,12 @@ export default function LandingPage() {
   const [currentFeature, setCurrentFeature] = useState(null)
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen bg-gray-900">
       <main className="flex-grow">
         <div className="w-full h-screen">
           <Canvas>
             <PerspectiveCamera makeDefault position={[0, 10, 20]} fov={60} />
-            <ambientLight intensity={0.5} />
-            <pointLight position={[10, 10, 10]} intensity={1} />
+            <ambientLight intensity={0.2} />
             <Suspense fallback={null}>
               <CrossChainEcosystem setCurrentFeature={setCurrentFeature} />
               {features.map((feature, index) => (
@@ -38,20 +38,15 @@ export default function LandingPage() {
                   isActive={currentFeature === index}
                 />
               ))}
+              <Torch position={[0, 10, 5]} />
             </Suspense>
             <OrbitControls enableZoom={true} maxPolarAngle={Math.PI / 2} minPolarAngle={Math.PI / 6} />
             
             <Html fullscreen>
-              <div className="absolute top-0 left-0 p-4 text-white">
-                <h1 className="text-4xl font-bold mb-2">CrossChain USDCLoans</h1>
-                <p className="text-xl">Empowering global access to digital dollars</p>
+              <div className="absolute top-0 left-0 p-4 text-yellow-300 bg-black bg-opacity-50 rounded-lg m-4">
+                <h1 className="text-4xl font-bold mb-2 text-yellow-400">CrossChain USDCLoans</h1>
+                <p className="text-xl text-yellow-200">Empowering global access to digital dollars</p>
               </div>
-              {currentFeature !== null && (
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-black bg-opacity-50 text-white">
-                  <h2 className="text-2xl font-bold mb-2">{features[currentFeature].title}</h2>
-                  <p>{features[currentFeature].description}</p>
-                </div>
-              )}
             </Html>
           </Canvas>
         </div>
