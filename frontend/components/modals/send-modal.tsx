@@ -135,7 +135,7 @@ const SendModal = () => {
       // checking if the destination address is same as the from address
       if (values.destinationAddress == values.fromAddress) {
         form.setError("destinationAddress", {
-          message: "You can't send token to yourself",
+          message: "You cannot send token to yourself",
         }); // setting the error message if the destination address is same as the from address
         return;
       }
@@ -277,7 +277,7 @@ const SendModal = () => {
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Reciever's Name (optional)</FormLabel>
+                    <FormLabel>Reciever Name (optional)</FormLabel>
 
                     <FormControl>
                       <Input placeholder="Name of Reciever" {...field} />
