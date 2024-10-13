@@ -16,6 +16,14 @@ export const siteConfig = {
     {
       title: "Dashboard",
       href: "/dashboard",
+    },
+    {
+      title: "CCTP Bridge",
+      href: "/cctp",
+    },
+    {
+      title: "Wormhole Bridge",
+      href: "/wormhole",
     }
   ],
   links: {

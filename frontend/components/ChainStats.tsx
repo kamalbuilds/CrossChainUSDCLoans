@@ -27,7 +27,7 @@ export default function ChainStats({ chains }) {
             <CardContent>
               <div>
                 <div className="underline" style={{ backgroundColor: chain.color }}></div>
-                <p><strong>Balance:</strong> {chain.balance}</p>
+                <p><strong>Balance:</strong> {chain.balance * 10 ** 12} </p>
               </div>
             </CardContent>
           </Card>

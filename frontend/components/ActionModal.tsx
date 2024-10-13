@@ -1,11 +1,13 @@
 // @ts-nocheck
 import React, { useState } from "react"
 import { ethers } from "ethers"
+import axios from 'axios'
 import {
   createThirdwebClient,
   defineChain,
   getContract,
   prepareContractCall,
+  sendAndConfirmTransaction,
 } from "thirdweb"
 import { useSendTransaction } from "thirdweb/react"
 
@@ -30,13 +32,15 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-import { Button } from "./ui/button"
-import { Input } from "./ui/input"
-import { Label } from "./ui/label"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 export default function ActionModal({ action, chains, updateStats }) {
   const [amount, setAmount] = useState("")
   const [selectedChain, setSelectedChain] = useState(null)
+  const [executionMethod, setExecutionMethod] = useState("thirdweb")
 
   const { mutate: sendTransaction } = useSendTransaction();
 
@@ -44,85 +48,98 @@ export default function ActionModal({ action, chains, updateStats }) {
     clientId: process.env.NEXT_PUBLIC_THIRDWEB_KEY!,
   })
 
+  const executeWithCircle = async (abiFunctionSignature, abiParameters) => {
+    const options = {
+      method: 'POST',
+      url: 'https://api.circle.com/v1/w3s/user/transactions/contractExecution',
+      headers: {
+        Authorization: `Bearer ${process.env.NEXT_PUBLIC_CIRCLE_API_KEY}`,
+        accept: 'application/json',
+        'content-type': 'application/json',
+        'X-User-Token': process.env.NEXT_PUBLIC_CIRCLE_USER_TOKEN
+      },
+      data: {
+        abiFunctionSignature,
+        abiParameters,
+        idempotencyKey: crypto.randomUUID(),
+        contractAddress: selectedChain.spokeAddress,
+        feeLevel: 'HIGH',
+        walletId: process.env.NEXT_PUBLIC_CIRCLE_WALLET_ID
+      }
+    };
+
+    try {
+      const { data } = await axios.request(options);
+      console.log(data);
+      return data;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  }
 
   const handleSubmit = async (e: any) => {
     e.preventDefault();
 
-    console.log(selectedChain, amount)
-
-    console.log("Called submit")
     if (!selectedChain || !amount) return
 
     try {
-        console.log("action", action , amount.toString())
       const weiAmount = ethers.parseEther(amount.toString())
 
-      if (action === "Deposit") {
-        const contract = getContract({
-          client,
-          chain: defineChain(selectedChain.chainID),
-          address: selectedChain?.spokeAddress,
-        })
+      if (executionMethod === "circle") {
+        let abiFunctionSignature, abiParameters;
 
-        const transaction = prepareContractCall({
-          contract,
-          method: "function deposit(uint256 amount)",
-          params: [weiAmount],
-        })
-
-        console.log("transaction", transaction);
-
-        try {
-          await sendTransaction(transaction)
-        } catch (error) {
-          console.error(error);
+        switch(action) {
+          case "Deposit":
+            abiFunctionSignature = "deposit(uint256)";
+            break;
+          case "Withdraw":
+            abiFunctionSignature = "requestWithdraw(uint256)";
+            break;
+          case "Borrow":
+            abiFunctionSignature = "requestBorrow(uint256)";
+            break;
+          case "Repay":
+            abiFunctionSignature = "repayBorrow(uint256)";
+            break;
         }
-      } else if (action === "Withdraw") {
+
+        abiParameters = [weiAmount.toString()];
+
+        await executeWithCircle(abiFunctionSignature, abiParameters);
+      } else {
         const contract = getContract({
           client,
           chain: defineChain(selectedChain.chainID),
           address: selectedChain?.spokeAddress,
         })
 
-        const transaction = await prepareContractCall({
-          contract,
-          method: "function requestWithdraw(uint256 amount)",
-          params: [weiAmount],
-        })
-
-        await sendTransaction(transaction)
-      } else if (action === "Borrow") {
-        const contract = getContract({
-          client,
-          chain: defineChain(selectedChain.chainID),
-          address: selectedChain?.spokeAddress,
-        })
-
-        const transaction = await prepareContractCall({
-          contract,
-          method: "function requestBorrow(uint256 amount)",
-          params: [weiAmount],
-        })
-
-        await sendTransaction(transaction)
-      } else if (action === "Repay") {
-        const contract = getContract({
-          client,
-          chain: defineChain(selectedChain.chainID),
-          address: selectedChain?.spokeAddress,
-        })
+        let method;
+        switch(action) {
+          case "Deposit":
+            method = "function deposit(uint256 amount)";
+            break;
+          case "Withdraw":
+            method = "function requestWithdraw(uint256 amount)";
+            break;
+          case "Borrow":
+            method = "function requestBorrow(uint256 amount)";
+            break;
+          case "Repay":
+            method = "function repayBorrow(uint256 amount)";
+            break;
+        }
 
         const transaction = await prepareContractCall({
           contract,
-          method: "function repayBorrow(uint256 amount)",
+          method,
           params: [weiAmount],
         })
 
         await sendTransaction(transaction)
       }
 
-      updateStats(weiAmount) // Update stats after the transaction
-      // setIsModalOpen(false);
+      updateStats(weiAmount)
     } catch (err) {
       console.error(err)
     }
@@ -168,13 +185,26 @@ export default function ActionModal({ action, chains, updateStats }) {
                       <SelectGroup>
                         <SelectLabel>Select Chain</SelectLabel>
                         {chains.map((chain) => (
-                          <SelectItem value={chain.name}>
+                          <SelectItem key={chain.name} value={chain.name}>
                             {chain.name}
                           </SelectItem>
                         ))}
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="mb-3">
+                  <Label>Execution Method</Label>
+                  <RadioGroup defaultValue="thirdweb" onValueChange={(value) => setExecutionMethod(value)}>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="thirdweb" id="thirdweb" />
+                      <Label htmlFor="thirdweb">Browser Wallet</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="circle" id="circle" />
+                      <Label htmlFor="circle">Circle Programmable Wallet</Label>
+                    </div>
+                  </RadioGroup>
                 </div>
               </div>
             </div>
