@@ -71,7 +71,7 @@ export default function LandingPage() {
 
         <motion.section className="mb-16 text-center" initial="initial" animate="animate" variants={fadeIn}>
           <motion.h2 className="mb-4 text-3xl font-bold text-gray-900" variants={fadeIn}>
-            Powered by Circle's Technology Stack
+            Powered by Circle&apos;s Technology Stack
           </motion.h2>
           <motion.p className="mb-8 text-xl text-gray-600" variants={fadeIn}>
             Leveraging USDC, Wormhole, Programmable Wallets, CCTP, and NTT for a robust and secure platform.
