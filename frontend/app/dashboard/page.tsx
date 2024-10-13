@@ -44,7 +44,7 @@ export default function Dashboard() {
           chainID: 84532,
           rpc: "https://sepolia.base.org",
           wormholeID: 10004,
-          spokeAddress: "0x42bf9b7d5c3627b273d7ce3929ef0c224209e89b",
+          spokeAddress: "0x30429aC3d1aC9182C8B062706fD0ebB781Dd144D",
           tokenAddress: "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
           symbol: "ETH",
           balance: "0",
@@ -70,7 +70,7 @@ export default function Dashboard() {
           chainID: 43113,
           rpc: "https://rpc.ankr.com/avalanche_fuji",
           wormholeID: 6,
-          spokeAddress: "0x42bf9b7D5c3627b273D7ce3929EF0c224209E89b",
+          spokeAddress: "0x8dC3DF83A645aBec8beAF8015239Af9461333D81",
           tokenAddress: "0x5425890298aed601595a70AB815c96711a31Bc65",
           symbol: "AVAX",
           balance: "0",
@@ -137,7 +137,7 @@ export default function Dashboard() {
     const contract = getContract({
       client,
       chain: defineChain(11155111),
-      address: "0xDdcD1015078baa3E5794Eb8d9Ff4Df4835669A9c",
+      address: "0x30429ac3d1ac9182c8b062706fd0ebb781dd144d",
     })
 
     const borrowsdata = await readContract({
@@ -152,8 +152,8 @@ export default function Dashboard() {
       params: [address?.address!],
     })
 
-    setDeposited(Number(depositdata) / 10 ** 18)
-    setBorrowed(Number(borrowsdata) / 10 ** 18)
+    setDeposited(Number(depositdata) / 10 ** 6)
+    setBorrowed(Number(borrowsdata) / 10 ** 6)
   }
 
   return (
