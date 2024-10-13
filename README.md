@@ -2,8 +2,6 @@
 
 ## CrossChain USDC Loans
 
-![image](https://github.com/user-attachments/assets/dc3a27d6-b883-4ce2-bb0f-1205b2b4ebb9)
-
 ## **Problem Statement:**
 
 In many parts of the world, access to stable currencies like the U.S. Dollar is limited, particularly for individuals without a bank account or those in regions facing economic instability. Traditional financial systems often restrict access to international currencies, creating barriers to financial stability. This challenge highlights the need for global access to digital dollars, offering a secure and stable store of value, accessible to anyone regardless of their location or banking status.
@@ -26,21 +24,53 @@ CrossChain USDCLoans offers a decentralized, blockchain-based solution to provid
   
 - **Global Accessibility**: Users from around the world can hold and transact in USDC without needing a traditional bank account, offering financial inclusion and stability.
 
-### Demo Video
-
 ## **Circle's Technology Stack in Use:**
 
 ### **USDC Utilization:**
 
 USDC, as the core asset of the platform, provides a stable store of value and serves as the currency for all transactions, including lending, borrowing, and repayments. Its inherent stability as a fully-backed digital dollar ensures trust and reliability.
 
+Code - https://github.com/kamalbuilds/CrossChainUSDCLoans/tree/master/frontend/app/api/wallet
+
 ### **Programmable Wallets:**
 
 Circle's Programmable Wallets provide seamless integration with user interfaces, enabling smooth handling of USDC transactions and ensuring that users have full control of their assets across all chains.
 
+Code - https://github.com/kamalbuilds/CrossChainUSDCLoans/tree/master/frontend/app/api/users
+
+https://github.com/kamalbuilds/CrossChainUSDCLoans/blob/master/frontend/app/api/contract-executions/route.ts
+
+```
+const response = await axios.post(
+      'https://api.circle.com/v1/w3s/user/transactions/contractExecution',
+      {
+        abiFunctionSignature,
+        abiParameters,
+        idempotencyKey: crypto.randomUUID(),
+        contractAddress,
+        feeLevel: 'HIGH',
+        walletId: walletid
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_CIRCLE_API_KEY}`,
+          'Content-Type': 'application/json',
+          'X-User-Token': userToken
+        }
+      }
+    )
+
+    return NextResponse.json(response.data)
+  } catch (error) {
+    console.error('Error calling Circle API:', error)
+    return NextResponse.json({ error: 'Error calling Circle API' }, { status: 500 })
+  }
+```
 ### **CCTP (Cross-Chain Transfer Protocol):**
 
 By utilizing Circle’s CCTP, the project ensures efficient cross-chain transfers of USDC, offering low-cost, fast, and secure transfers, allowing users to interact with the decentralized loan system across multiple chains.
+
+Code - https://github.com/kamalbuilds/CrossChainUSDCLoans/blob/master/frontend/app/cctp/page.tsx
 
 ```mermaid
 graph TD
@@ -74,6 +104,8 @@ graph TD
 ### **Wormhole's Core Contracts Utilisation:**
 
 Wormhole’s **cross-chain interoperability** is central to the platform, enabling seamless communication between the hub and spoke chains. The project leverages **Wormhole Relayer** to transfer messages and assets between blockchains, allowing users to deposit, borrow, and repay USDC loans across multiple chains. This is facilitated through **secure payload delivery** via `sendPayloadToEvm`, which coordinates with Wormhole's **cross-chain messaging** capabilities. The use of **Wormhole Receiver** ensures proper message handling on each chain, enabling the transfer and management of user assets without liquidity fragmentation, preserving security and trust across the platform.
+
+Code - https://github.com/kamalbuilds/CrossChainUSDCLoans/blob/master/smartcontract/contracts/CrossChainLendingSpoke.sol
 
 ```mermaid
 graph TD

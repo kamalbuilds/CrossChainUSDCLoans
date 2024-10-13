@@ -14,7 +14,7 @@ export default function LiquidityChart({ chains } : any) {
     const contract = getContract({
         client,
         chain: defineChain(11155111),
-        address: "0x76414c98ee9AD3F776054f16A351831b71870Ff3",
+        address: "0x30429ac3d1ac9182c8b062706fd0ebb781dd144d",
     });
 
     useEffect(() => {
@@ -35,7 +35,7 @@ export default function LiquidityChart({ chains } : any) {
                         });
 
                         console.log(data, "data")
-                        chainData.push(parseInt(data?.toString()!) / 10 ** 18);
+                        chainData.push(parseInt(data?.toString()!) / 10 ** 6);
                         console.log(id, data);
 
                         if (newLabels.length <= i) {

@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { v4 as uuidv4 } from "uuid";
 
 export default function ActionModal({ action, chains, updateStats }) {
   const [amount, setAmount] = useState("")
@@ -46,35 +47,23 @@ export default function ActionModal({ action, chains, updateStats }) {
 
   const client = createThirdwebClient({
     clientId: process.env.NEXT_PUBLIC_THIRDWEB_KEY!,
-  })
+  });
+
+  
 
   const executeWithCircle = async (abiFunctionSignature, abiParameters) => {
-    const options = {
-      method: 'POST',
-      url: 'https://api.circle.com/v1/w3s/user/transactions/contractExecution',
-      headers: {
-        Authorization: `Bearer ${process.env.NEXT_PUBLIC_CIRCLE_API_KEY}`,
-        accept: 'application/json',
-        'content-type': 'application/json',
-        'X-User-Token': process.env.NEXT_PUBLIC_CIRCLE_USER_TOKEN
-      },
-      data: {
+    try {
+      const response = await axios.post('/api/contract-executions', {
         abiFunctionSignature,
         abiParameters,
-        idempotencyKey: crypto.randomUUID(),
         contractAddress: selectedChain.spokeAddress,
-        feeLevel: 'HIGH',
-        walletId: process.env.NEXT_PUBLIC_CIRCLE_WALLET_ID
-      }
-    };
-
-    try {
-      const { data } = await axios.request(options);
-      console.log(data);
-      return data;
+        walletid: process.env.NEXT_PUBLIC_CIRCLE_WALLET_ID
+      })
+      console.log(response.data)
+      return response.data
     } catch (error) {
-      console.error(error);
-      throw error;
+      console.error(error)
+      throw error
     }
   }
 
