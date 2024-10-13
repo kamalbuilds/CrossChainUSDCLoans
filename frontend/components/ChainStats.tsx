@@ -22,7 +22,7 @@ export default function ChainStats({ chains }) {
                 <Image src={chain.logo} alt={chain.name} className="mr-2 rounded-xl" width={24} height={24} />
                 {chain.name}
               </CardTitle>
-              <CardDescription>MultiChain Token Balance</CardDescription>
+              <CardDescription>USDC Balance</CardDescription>
             </CardHeader>
             <CardContent>
               <div>

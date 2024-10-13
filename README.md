@@ -26,15 +26,18 @@ CrossChain USDCLoans offers a decentralized, blockchain-based solution to provid
   
 - **Global Accessibility**: Users from around the world can hold and transact in USDC without needing a traditional bank account, offering financial inclusion and stability.
 
+### Demo Video
+
+
 ## **Circle's Technology Stack in Use:**
 
 ### **USDC Utilization:**
 
 USDC, as the core asset of the platform, provides a stable store of value and serves as the currency for all transactions, including lending, borrowing, and repayments. Its inherent stability as a fully-backed digital dollar ensures trust and reliability.
 
-### **Wormhole's Role:**
+### **Wormhole's Core Contracts Utilisation:**
 
-Wormhole’s core contract ensures cross-chain interoperability, allowing users to move USDC between different chains. This expands the user base beyond a single blockchain ecosystem, fostering an inclusive and versatile financial platform.
+Wormhole’s **cross-chain interoperability** is central to the platform, enabling seamless communication between the hub and spoke chains. The project leverages **Wormhole Relayer** to transfer messages and assets between blockchains, allowing users to deposit, borrow, and repay USDC loans across multiple chains. This is facilitated through **secure payload delivery** via `sendPayloadToEvm`, which coordinates with Wormhole's **cross-chain messaging** capabilities. The use of **Wormhole Receiver** ensures proper message handling on each chain, enabling the transfer and management of user assets without liquidity fragmentation, preserving security and trust across the platform.
 
 ### **Programmable Wallets:**
 
@@ -44,6 +47,6 @@ Circle's Programmable Wallets provide seamless integration with user interfaces,
 
 By utilizing Circle’s CCTP, the project ensures efficient cross-chain transfers of USDC, offering low-cost, fast, and secure transfers, allowing users to interact with the decentralized loan system across multiple chains.
 
-### **NTT (Non-Transferable Tokens):**
+### **Wormhole's Native Token Transfers (NTT):**
 
-Wormhole’s NTT feature is integrated to provide non-transferable identity tokens for users, ensuring proof of identity and reputation within the loan system. These tokens enhance trust and security, making the decentralized loan system more reliable and scalable.
+Wormhole’s NTT feature is integrated to provide secure cross-chain transfers of native tokens like USDC. NTT allows tokens to maintain their intrinsic properties across multiple chains, using mechanisms like burn-and-mint or lock-and-mint to ensure consistent token supply and prevent liquidity fragmentation. This flexibility enables seamless integration with multiple chains while maintaining full control over token contracts, ownership, and customization
