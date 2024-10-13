@@ -48,7 +48,7 @@ contract CrossChainLendingSpoke is IWormholeReceiver, Pausable , Ownable{
     }
 
     // Allows users to deposit ETH into the contract
-    function deposit(uint256 amount) external whenNotPaused {
+\    function deposit(uint256 amount) external whenNotPaused {
         require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 

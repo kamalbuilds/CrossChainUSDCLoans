@@ -28,16 +28,11 @@ CrossChain USDCLoans offers a decentralized, blockchain-based solution to provid
 
 ### Demo Video
 
-
 ## **Circle's Technology Stack in Use:**
 
 ### **USDC Utilization:**
 
 USDC, as the core asset of the platform, provides a stable store of value and serves as the currency for all transactions, including lending, borrowing, and repayments. Its inherent stability as a fully-backed digital dollar ensures trust and reliability.
-
-### **Wormhole's Core Contracts Utilisation:**
-
-Wormhole’s **cross-chain interoperability** is central to the platform, enabling seamless communication between the hub and spoke chains. The project leverages **Wormhole Relayer** to transfer messages and assets between blockchains, allowing users to deposit, borrow, and repay USDC loans across multiple chains. This is facilitated through **secure payload delivery** via `sendPayloadToEvm`, which coordinates with Wormhole's **cross-chain messaging** capabilities. The use of **Wormhole Receiver** ensures proper message handling on each chain, enabling the transfer and management of user assets without liquidity fragmentation, preserving security and trust across the platform.
 
 ### **Programmable Wallets:**
 
@@ -46,6 +41,97 @@ Circle's Programmable Wallets provide seamless integration with user interfaces,
 ### **CCTP (Cross-Chain Transfer Protocol):**
 
 By utilizing Circle’s CCTP, the project ensures efficient cross-chain transfers of USDC, offering low-cost, fast, and secure transfers, allowing users to interact with the decentralized loan system across multiple chains.
+
+```mermaid
+graph TD
+    A[User Visits Platform] --> B[Sets up Circle Programmable Wallet on /wallet Page]
+    B --> C[Deposits, Borrows, Repays, and Redeems USDC]
+    C --> D[Signs and Executes Transactions via Circle Wallet]
+    D --> E[Powered by Wormhole Core Contracts]
+    
+    C --> F{Does User Want USDC on a Particular Chain?}
+    F --> G[Yes: Bridges USDC using Circle's CCTP]
+    F --> H[No: Continues Multi-Chain Operations Seamlessly]
+    
+    F --> I{Does User Want to Bridge Other Assets?}
+    I --> J[Yes: Uses Wormhole NTT for Cross-Chain Asset Transfer]
+    I --> K[No: Keeps Assets on the Same Chain]
+
+    subgraph Multi-Chain Execution
+        E --> L[Wormhole Relayer Sends Payload to EVM]
+        L --> M[Hub & Spoke Chains Interact]
+        M --> N[User's Transactions Finalized Across Chains]
+    end
+```
+
+### Explanation:
+- **Users** come to the platform and set up their **Circle Programmable Wallet**.
+- They use this wallet to sign and execute transactions (Deposit, Borrow, Repay, Redeem) across multiple chains.
+- The **Wormhole Core Contracts** power the cross-chain operations, ensuring seamless execution, making users feel like they are working within one chain.
+- If users want to keep their USDC on a specific chain, they can use **Circle’s CCTP** to bridge USDC between chains.
+- For bridging other assets, **Wormhole's Native Token Transfers (NTT)** allows them to move assets across chains while retaining native token properties.
+
+### **Wormhole's Core Contracts Utilisation:**
+
+Wormhole’s **cross-chain interoperability** is central to the platform, enabling seamless communication between the hub and spoke chains. The project leverages **Wormhole Relayer** to transfer messages and assets between blockchains, allowing users to deposit, borrow, and repay USDC loans across multiple chains. This is facilitated through **secure payload delivery** via `sendPayloadToEvm`, which coordinates with Wormhole's **cross-chain messaging** capabilities. The use of **Wormhole Receiver** ensures proper message handling on each chain, enabling the transfer and management of user assets without liquidity fragmentation, preserving security and trust across the platform.
+
+```mermaid
+graph TD
+    A[CrossChainLendingHub] -->|Initiates| B[Dynamic Interest Rates]
+    B -->|Calculates Rate Based on| C[Utilization Ratio]
+    B -->|Updated Periodically| D[Interest Accrual]
+    D -->|Applies Across All Chains| E[Spoke Chains]
+
+    A -->|Handles| F[Cross-Chain Deposits]
+    F -->|Verifies and Records on| G[Spoke Balances]
+
+    A -->|Handles| H[Cross-Chain Borrows]
+    H -->|Ensures| I[Borrow Ratio <= 75% of Collateral]
+    H -->|Liquidates if| J[Collateral Falls Below 80%]
+
+    A -->|Executes| K[Liquidity Rebalancing]
+    K -->|Updates| L[Spoke Balances Across Chains]
+    L --> M[Historical Spoke Balances for Audit]
+
+    subgraph User Actions
+      U1[User Requests Deposit] --> F
+      U2[User Requests Borrow] --> H
+      U3[User Requests Repay] --> E
+    end
+
+    subgraph Monitoring & Security
+      N[Interaction Cooldown] --> A
+      P[Wormhole Relayer] -->|Handles Cross-Chain Messaging| Q[Spoke Chains]
+    end
+```
+
+### 1. **User Actions (Deposits, Borrows, Repayments)**:
+   - The user initiates actions such as deposits, borrows, or repayments. These are handled by the **CrossChainLendingHub** contract.
+   - For **Deposits**, the contract updates the user's balance on the **spoke chains** and records them in **spokeBalances**. 
+   - For **Borrows**, the system checks if the user’s collateral is sufficient (not exceeding 75% borrow ratio). If the collateral is insufficient, the system may trigger **liquidation**.
+   - For **Repayments**, the system updates both borrow and deposit balances.
+
+### 2. **Dynamic Interest Rates**:
+   - The interest rate is dynamically calculated by the hub based on the **utilization ratio** (the amount borrowed vs. the total deposits across all chains). 
+   - This dynamic rate helps optimize the system’s performance by adjusting rates according to liquidity demands.
+   - Interest is **accrued periodically** and applied across all **spoke chains**. These updates are recorded in historical balances for future audits.
+
+### 3. **Liquidity Rebalancing**:
+   - Liquidity is balanced across different spoke chains by the system to ensure there is enough collateral available on each chain to handle user actions.
+   - This rebalancing ensures smooth functionality across multiple chains by **updating balances** on the spoke chains and maintaining **historical records** of the changes for transparency.
+
+### 4. **Monitoring & Security**:
+   - An **interaction cooldown** ensures users can’t spam actions too frequently, maintaining the system's integrity.
+   - **Wormhole Relayer** handles all cross-chain messaging, enabling communication between the hub and spokes without the user feeling the complexity of different chains.
+
+This flow ensures that user actions like deposits and borrows are handled in real-time, while dynamic interest rates and liquidity rebalancing keep the system efficient and balanced across chains.|
+
+### Key Features Highlighted:
+- **Dynamic Interest Rates**: Interest rates are dynamically calculated based on the utilization ratio (borrows vs. deposits) and applied across all chains.
+- **Liquidity Rebalancing**: Balances are rebalanced across multiple spoke chains to ensure liquidity is properly distributed.
+- **Cross-Chain Operations**: Users can deposit, borrow, and repay across different chains while Wormhole Relayer handles cross-chain messaging, ensuring seamless operations.
+- **Collateral Management**: The system ensures that borrow ratios stay below 75% of collateral, and liquidation occurs when collateral falls below 80%.
+- **Historical Tracking**: Spoke balances are tracked over time for auditing purposes.
 
 ### **Wormhole's Native Token Transfers (NTT):**
 
