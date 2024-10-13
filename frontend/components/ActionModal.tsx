@@ -70,7 +70,13 @@ export default function ActionModal({ action, chains, updateStats }) {
           params: [weiAmount],
         })
 
-        await sendTransaction(transaction)
+        console.log("transaction", transaction);
+
+        try {
+          await sendTransaction(transaction)
+        } catch (error) {
+          console.error(error);
+        }
       } else if (action === "Withdraw") {
         const contract = getContract({
           client,

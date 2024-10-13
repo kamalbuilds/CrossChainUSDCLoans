@@ -3,48 +3,40 @@ pragma solidity ^0.8.0;
 
 import "./IWormholeRelayer.sol";
 import "./IWormholeReceiver.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+// import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract CrossChainLendingHub is IWormholeReceiver, ReentrancyGuard, Ownable {
-    // gas limit set
+contract CrossChainLendingHub is IWormholeReceiver, Ownable {
     uint256 constant GAS_LIMIT = 500_000;
 
     IWormholeRelayer public immutable wormholeRelayer;
-    uint16 hubChainID;
+    uint16 public hubChainID;
 
-    uint256 public constant INTEREST_RATE = 5; // 5% annual interest rate
     uint256 public lastInterestUpdate;
 
     mapping(address => uint256) public lastInteractionTime;
-    uint256 public constant INTERACTION_COOLDOWN = 1 hours;
+    uint256 public constant INTERACTION_COOLDOWN = 1 minutes;
 
-    event InterestAccrued(uint256 totalInterest);
-
-    function quoteCrossChainCost(
-        uint16 targetChain
-    ) public view returns (uint256 cost) {
-        (cost, ) = wormholeRelayer.quoteEVMDeliveryPrice(
-            targetChain,
-            0,
-            GAS_LIMIT
-        );
-    }
-
-    // mapping of borrowers and depositers, and the amounts they borrowed / deposited
     mapping(address => uint256) public deposits;
     mapping(address => uint256) public borrows;
 
-    // value contained in each of the spoke contracts
     uint16[] public spokes;
     mapping(uint16 => address) public spokeAddresses;
     mapping(uint16 => uint256) public spokeBalances;
     mapping(uint16 => uint256[]) public spokeBalancesHistorical;
 
+    uint256 public constant MAX_BORROW_RATIO = 75; // 75% of collateral
+    uint256 public constant LIQUIDATION_THRESHOLD = 80; // 80% of collateral
+
+    uint256 public baseRate = 2; // 2% base rate
+    uint256 public utilizationMultiplier = 20; // 20% multiplier
+
     event Deposit(uint16 spoke, address user, uint256 amount, uint256 balance);
     event Withdraw(uint16 spoke, address user, uint256 amount, uint256 balance);
     event Borrow(uint16 spoke, address user, uint256 amount);
     event Repay(uint16 spoke, address user, uint256 amount, uint256 remaining);
+    event InterestAccrued(uint256 totalInterest);
+    event Liquidation(address user, uint256 amount);
 
     constructor(address _wormholeRelayer, uint16 _hubChainID) Ownable(msg.sender) {
         wormholeRelayer = IWormholeRelayer(_wormholeRelayer);
@@ -52,7 +44,37 @@ contract CrossChainLendingHub is IWormholeReceiver, ReentrancyGuard, Ownable {
         lastInterestUpdate = block.timestamp;
     }
 
-    function deposit(uint16 spoke, address user, uint256 amount) internal nonReentrant {
+    function quoteCrossChainCost(uint16 targetChain) public view returns (uint256 cost) {
+        (cost, ) = wormholeRelayer.quoteEVMDeliveryPrice(targetChain, 0, GAS_LIMIT);
+    }
+
+    function calculateInterestRate() public view returns (uint256) {
+        uint256 totalDeposits = getTotalDeposits();
+        uint256 totalBorrows = getTotalBorrows();
+        if (totalDeposits == 0) return baseRate;
+        uint256 utilization = (totalBorrows * 1e18) / totalDeposits;
+        return baseRate + (utilization * utilizationMultiplier) / 1e18;
+    }
+
+    function getTotalDeposits() public view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < spokes.length; i++) {
+            total += spokeBalances[spokes[i]];
+        }
+        return total;
+    }
+
+    function getTotalBorrows() public view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < spokes.length; i++) {
+            for (uint256 j = 0; j < spokeBalancesHistorical[spokes[i]].length; j++) {
+                total += spokeBalancesHistorical[spokes[i]][j];
+            }
+        }
+        return total;
+    }
+
+    function deposit(uint16 spoke, address user, uint256 amount) internal {
         require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
         updateInterest();
         deposits[user] += amount;
@@ -63,12 +85,32 @@ contract CrossChainLendingHub is IWormholeReceiver, ReentrancyGuard, Ownable {
         lastInteractionTime[user] = block.timestamp;
     }
 
-    // Allows users to repay their borrowed ETH
-    // 
-    // This doesn't return in a failure case, so if a user tries to repay more 
-    // than they owe or if they don't have any outstanding borrows, their funds
-    // will be locked in the contract.
-    function repayBorrow(uint16 spoke, address user, uint256 amount) internal nonReentrant {
+    function requestWithdraw(uint16 spoke, address user, uint256 amount) internal {
+        require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
+        updateInterest();
+        require(deposits[user] >= amount, "Insufficient balance");
+        deposits[user] -= amount;
+        
+        withdrawSpoke(spoke, amount);
+
+        emit Withdraw(spoke, user, amount, deposits[user]);
+        lastInteractionTime[user] = block.timestamp;
+    }
+
+    function requestBorrow(uint16 spoke, address user, uint256 amount) internal {
+        require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
+        updateInterest();
+        uint256 newBorrowAmount = borrows[user] + amount;
+        require(deposits[user] * MAX_BORROW_RATIO / 100 >= newBorrowAmount, "Not enough collateral");
+        
+        withdrawSpoke(spoke, amount);
+        borrows[user] = newBorrowAmount;
+
+        emit Borrow(spoke, user, amount);
+        lastInteractionTime[user] = block.timestamp;
+    }
+
+    function repayBorrow(uint16 spoke, address user, uint256 amount) internal  {
         require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
         updateInterest();
         uint256 borrowedAmount = borrows[user];
@@ -84,166 +126,68 @@ contract CrossChainLendingHub is IWormholeReceiver, ReentrancyGuard, Ownable {
         lastInteractionTime[user] = block.timestamp;
     }
 
-    function requestWithdraw(uint16 spoke, address user, uint256 amount) internal nonReentrant {
-        require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
-        updateInterest();
-        require(deposits[user] >= amount, "Insufficient balance");
-        deposits[user] -= amount;
-        
-        withdrawSpoke(spoke, amount);
-
-        // Info payload is the bytes of the information that's actually valuable
-        bytes memory infoPayload = abi.encode(user, amount);
-        // Main payload just contains which function to call
-        bytes memory mainPayload = abi.encode("approveWithdraw", infoPayload);
-        
-        uint256 cost = quoteCrossChainCost(spoke);
-
-        wormholeRelayer.sendPayloadToEvm{value: cost}(
-            spoke,
-            spokeAddresses[spoke],
-            mainPayload,
-            0,
-            GAS_LIMIT
-        );
-
-
-        emit Withdraw(spoke, user, amount, deposits[user]);
-        lastInteractionTime[user] = block.timestamp;
-    }
-
-    function requestBorrow(uint16 spoke, address user, uint256 amount) internal nonReentrant {
-        require(block.timestamp >= lastInteractionTime[user] + INTERACTION_COOLDOWN, "Interaction too frequent");
-        updateInterest();
-        require(deposits[user] / 2 >= borrows[user] + amount, "Not enough collateral");
-        
-        withdrawSpoke(spoke, amount);
-        borrows[user] += amount;
-
-        // Info payload is the bytes of the information that's actually valuable
-        bytes memory infoPayload = abi.encode(user, amount);
-        // Main payload just contains which function to call
-        bytes memory mainPayload = abi.encode("approveBorrow", infoPayload);
-
-        uint256 cost = quoteCrossChainCost(spoke);
-
-        wormholeRelayer.sendPayloadToEvm{value: cost}(
-            spoke,
-            spokeAddresses[spoke],
-            mainPayload,
-            0,
-            GAS_LIMIT
-        );
-
-        emit Borrow(spoke, user, amount);
-        lastInteractionTime[user] = block.timestamp;
-    }
-
-    function receiveWormholeMessages(
-        bytes memory payload,
-        bytes[] memory, // additionalVaas
-        bytes32, // address that called 'sendPayloadToEvm'
-        uint16, // spoke
-        bytes32 // unique identifier of delivery
-    ) public payable override {
-        require(msg.sender == address(wormholeRelayer), "Only relayer allowed");
-
-        // Parse the payload and do the corresponding actions!
-        (string memory functionName, bytes memory infoPayload) = abi.decode(
-            payload,
-            (string, bytes)
-        );
-
-        if (keccak256(abi.encodePacked(functionName)) == keccak256(abi.encodePacked("deposit"))) {
-            (uint16 spoke, address user, uint256 amount) = abi.decode(
-                infoPayload,
-                (uint16, address, uint256)
-            );
-            deposit(spoke, user, amount);
-        } else if (keccak256(abi.encodePacked(functionName)) == keccak256(abi.encodePacked("repayBorrow"))) {
-            (uint16 spoke, address user, uint256 amount) = abi.decode(
-                infoPayload,
-                (uint16, address, uint256)
-            );
-            repayBorrow(spoke, user, amount);
-        } else if (keccak256(abi.encodePacked(functionName)) == keccak256(abi.encodePacked("requestWithdraw"))) {
-            (uint16 spoke, address user, uint256 amount) = abi.decode(
-                infoPayload,
-                (uint16, address, uint256)
-            );
-            requestWithdraw(spoke, user, amount);
-        } else if (keccak256(abi.encodePacked(functionName)) == keccak256(abi.encodePacked("requestBorrow"))) {
-            (uint16 spoke, address user, uint256 amount) = abi.decode(
-                infoPayload,
-                (uint16, address, uint256)
-            );
-            requestBorrow(spoke, user, amount);
-        }
-    }
-
-    // withdrawSpoke withdraws an amount from a spoke.  If that spoke can't pay 
-    // the amount, re-distributes liquidity so that it has enough.
-    function withdrawSpoke(uint16 spoke, uint256 amount) internal {
-        if (spokeBalances[spoke] < amount) {
-            redistributeValueToSpoke(spoke, amount);
-        }
-
-        spokeBalances[spoke] -= amount;
-        spokeBalancesHistorical[spoke].push(spokeBalances[spoke]);
-    }
-
-    // redistributeValueToSpoke distributes the liquidity from all spokes into 
-    // a target spoke, making sure that the selected spoke has a given amount
-    // of liquidity 
-    function redistributeValueToSpoke(uint16 dSpoke, uint256 targetAmount) internal {
-        require(spokeBalances[dSpoke] < targetAmount, "Spoke already has enough liquidity");
-
-        // calculate the desired value per spoke
-        uint256 totalAmount = 0;
-        for (uint256 i = 0; i < spokes.length; i++) {
-            totalAmount += spokeBalances[spokes[i]];
-        }
-        uint256 desiredSpokeValue = totalAmount / spokes.length;
-
-        // calculate how much to re-distribute to the target spoke
-        uint256 deltaSpokeValue = desiredSpokeValue - spokeBalances[dSpoke];
-        deltaSpokeValue = max(targetAmount, deltaSpokeValue);
-
-        // re-distribute from all spokes to the target spoke
-        for (uint256 i = 0; i < spokes.length; i++) {
-            uint16 tSpoke = spokes[i];
-            if (tSpoke == dSpoke) {
-                continue;
+    function updateInterest() internal {
+        uint256 timeElapsed = block.timestamp - lastInterestUpdate;
+        if (timeElapsed > 0) {
+            uint256 totalBorrows = getTotalBorrows();
+            uint256 currentRate = calculateInterestRate();
+            uint256 interest = totalBorrows * currentRate * timeElapsed / (365 days * 100);
+            
+            uint256 totalDeposits = getTotalDeposits();
+            for (uint256 i = 0; i < spokes.length; i++) {
+                uint16 spoke = spokes[i];
+                uint256 spokeInterest = interest * spokeBalances[spoke] / totalDeposits;
+                spokeBalances[spoke] += spokeInterest;
+                spokeBalancesHistorical[spoke].push(spokeBalances[spoke]);
             }
 
-            uint256 transferAmount = min(deltaSpokeValue, spokeBalances[tSpoke] - desiredSpokeValue);
+            lastInterestUpdate = block.timestamp;
+            emit InterestAccrued(interest);
+        }
 
-            // transfer the transferAmount from the target spoke to the destination spoke
-            deltaSpokeValue -= transferAmount;
-
-            sendBridgeRequest(tSpoke, dSpoke, transferAmount);
+        for (uint256 i = 0; i < spokes.length; i++) {
+            for (uint256 j = 0; j < spokeBalancesHistorical[spokes[i]].length; j++) {
+                checkAndLiquidate(address(uint160(j))); // This is a simplification, you may need to adjust based on how you store user addresses
+            }
         }
     }
 
-    function sendBridgeRequest(uint16 tSpoke, uint16 dSpoke, uint256 amount) internal {
-        require(spokeBalances[tSpoke] >= amount, "Insufficient balance");
+    function getCollateralRatio(address user) public view returns (uint256) {
+        if (borrows[user] == 0) return 0;
+        return (deposits[user] * 100) / borrows[user];
+    }
 
-        spokeBalances[tSpoke] -= amount;
-        spokeBalancesHistorical[tSpoke].push(spokeBalances[tSpoke]);
-        spokeBalances[dSpoke] += amount;
-        spokeBalancesHistorical[dSpoke].push(spokeBalances[dSpoke]);
+    function checkAndLiquidate(address user) internal {
+        if (getCollateralRatio(user) >= LIQUIDATION_THRESHOLD) {
+            uint256 amountToLiquidate = borrows[user] - (deposits[user] * MAX_BORROW_RATIO / 100);
+            borrows[user] -= amountToLiquidate;
+            deposits[user] -= amountToLiquidate;
 
+            uint256 totalDeposits = getTotalDeposits();
+            for (uint256 i = 0; i < spokes.length; i++) {
+                uint16 spoke = spokes[i];
+                uint256 spokeLiquidation = amountToLiquidate * spokeBalances[spoke] / totalDeposits;
+                spokeBalances[spoke] += spokeLiquidation;
+                spokeBalancesHistorical[spoke].push(spokeBalances[spoke]);
+            }
 
-        // Info payload is the bytes of the information that's actually valuable
-        bytes memory infoPayload = abi.encode(dSpoke, spokeAddresses[dSpoke], amount);
-        // Main payload just contains which function to call
-        bytes memory mainPayload = abi.encode("bridgeToSpoke", infoPayload);
+            emit Liquidation(user, amountToLiquidate);
+        }
+    }
 
-        uint256 cost = quoteCrossChainCost(tSpoke);
+    function withdrawSpoke(uint16 spoke, uint256 amount) internal {
+        require(spokeBalances[spoke] >= amount, "Insufficient spoke balance");
+        spokeBalances[spoke] -= amount;
+        spokeBalancesHistorical[spoke].push(spokeBalances[spoke]);
+
+        bytes memory infoPayload = abi.encode(spoke, spokeAddresses[spoke], amount);
+        bytes memory mainPayload = abi.encode("withdrawSpoke", infoPayload);
+
+        uint256 cost = quoteCrossChainCost(spoke);
 
         wormholeRelayer.sendPayloadToEvm{value: cost}(
-            tSpoke,
-            spokeAddresses[tSpoke],
+            spoke,
+            spokeAddresses[spoke],
             mainPayload,
             0,
             GAS_LIMIT
@@ -257,39 +201,35 @@ contract CrossChainLendingHub is IWormholeReceiver, ReentrancyGuard, Ownable {
         spokeBalancesHistorical[spoke].push(0);
     }
 
-    function max(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a >= b ? a : b;
-    }
-
-    function min(uint256 a, uint256 b) internal pure returns (uint256) {
-        return a < b ? a : b;
-    }
-
     receive() external payable {}
 
-    function sendEth(address payable recipient, uint256 amount) external {
+    function sendEth(address payable recipient, uint256 amount) external onlyOwner {
         recipient.transfer(amount);
     }
 
-    function updateInterest() internal {
-        uint256 timeElapsed = block.timestamp - lastInterestUpdate;
-        if (timeElapsed > 0) {
-            uint256 totalBorrows = 0;
-            for (uint256 i = 0; i < spokes.length; i++) {
-                totalBorrows += spokeBalances[spokes[i]];
-            }
-            uint256 interest = totalBorrows * INTEREST_RATE * timeElapsed / (365 days * 100);
-            
-            // Distribute interest to depositors
-            for (uint256 i = 0; i < spokes.length; i++) {
-                uint16 spoke = spokes[i];
-                uint256 spokeInterest = interest * spokeBalances[spoke] / totalBorrows;
-                spokeBalances[spoke] += spokeInterest;
-                spokeBalancesHistorical[spoke].push(spokeBalances[spoke]);
-            }
+    function receiveWormholeMessages(
+        bytes memory payload,
+        bytes[] memory,
+        bytes32,
+        uint16 sourceChain,
+        bytes32
+    ) public payable override {
+        require(msg.sender == address(wormholeRelayer), "Only relayer allowed");
 
-            lastInterestUpdate = block.timestamp;
-            emit InterestAccrued(interest);
+        (string memory functionName, bytes memory infoPayload) = abi.decode(payload, (string, bytes));
+
+        if (keccak256(abi.encodePacked(functionName)) == keccak256(abi.encodePacked("deposit"))) {
+            (uint16 spoke, address user, uint256 amount) = abi.decode(infoPayload, (uint16, address, uint256));
+            deposit(spoke, user, amount);
+        } else if (keccak256(abi.encodePacked(functionName)) == keccak256(abi.encodePacked("withdraw"))) {
+            (uint16 spoke, address user, uint256 amount) = abi.decode(infoPayload, (uint16, address, uint256));
+            requestWithdraw(spoke, user, amount);
+        } else if (keccak256(abi.encodePacked(functionName)) == keccak256(abi.encodePacked("borrow"))) {
+            (uint16 spoke, address user, uint256 amount) = abi.decode(infoPayload, (uint16, address, uint256));
+            requestBorrow(spoke, user, amount);
+        } else if (keccak256(abi.encodePacked(functionName)) == keccak256(abi.encodePacked("repay"))) {
+            (uint16 spoke, address user, uint256 amount) = abi.decode(infoPayload, (uint16, address, uint256));
+            repayBorrow(spoke, user, amount);
         }
     }
 }

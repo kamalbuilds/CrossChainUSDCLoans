@@ -5,10 +5,9 @@ import "./CrossChainToken.sol";
 import "./IWormholeReceiver.sol";
 import "./IWormholeRelayer.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
-contract CrossChainLendingSpoke is IWormholeReceiver, ReentrancyGuard, Pausable , Ownable{
+contract CrossChainLendingSpoke is IWormholeReceiver, Pausable , Ownable{
     uint256 constant GAS_LIMIT = 500_000;
     IWormholeRelayer public immutable wormholeRelayer;
     uint16 spokeChainID;
@@ -26,7 +25,7 @@ contract CrossChainLendingSpoke is IWormholeReceiver, ReentrancyGuard, Pausable 
     uint256 public constant LIQUIDATION_THRESHOLD = 80; // 80% of collateral
 
     mapping(address => uint256) public lastInteractionTime;
-    uint256 public constant INTERACTION_COOLDOWN = 1 hours;
+    uint256 public constant INTERACTION_COOLDOWN = 1 minutes;
 
     event LiquidationTriggered(address user, uint256 amount);
 
@@ -49,7 +48,7 @@ contract CrossChainLendingSpoke is IWormholeReceiver, ReentrancyGuard, Pausable 
     }
 
     // Allows users to deposit ETH into the contract
-    function deposit(uint256 amount) external whenNotPaused nonReentrant {
+    function deposit(uint256 amount) external whenNotPaused {
         require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 
@@ -72,7 +71,7 @@ contract CrossChainLendingSpoke is IWormholeReceiver, ReentrancyGuard, Pausable 
         lastInteractionTime[msg.sender] = block.timestamp;
     }
 
-    function repayBorrow(uint256 amount) external whenNotPaused nonReentrant {
+    function repayBorrow(uint256 amount) external whenNotPaused  {
         require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 
@@ -95,7 +94,7 @@ contract CrossChainLendingSpoke is IWormholeReceiver, ReentrancyGuard, Pausable 
         lastInteractionTime[msg.sender] = block.timestamp;
     }
 
-    function requestWithdraw(uint256 amount) external whenNotPaused nonReentrant {
+    function requestWithdraw(uint256 amount) external whenNotPaused  {
         require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 
@@ -116,7 +115,7 @@ contract CrossChainLendingSpoke is IWormholeReceiver, ReentrancyGuard, Pausable 
         lastInteractionTime[msg.sender] = block.timestamp;
     }
 
-    function requestBorrow(uint256 amount) external whenNotPaused nonReentrant {
+    function requestBorrow(uint256 amount) external whenNotPaused {
         require(block.timestamp >= lastInteractionTime[msg.sender] + INTERACTION_COOLDOWN, "Interaction too frequent");
         address user = msg.sender;
 
