@@ -1,6 +1,4 @@
-# **Empowering Enterprises with Blockchain Innovation**  
-
-## CrossChain USDC Loans
+## CrossChain USDC Loans - Empowering Enterprises with Blockchain Innovation
 
 ## **Problem Statement:**
 
